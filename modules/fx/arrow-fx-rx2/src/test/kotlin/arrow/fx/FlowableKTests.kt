@@ -27,7 +27,6 @@ import arrow.test.generators.GenK
 import arrow.test.laws.AsyncLaws
 import arrow.test.laws.ConcurrentLaws
 import arrow.test.laws.MonadFilterLaws
-import arrow.test.laws.TimerLaws
 import arrow.test.laws.TraverseLaws
 import arrow.typeclasses.Eq
 import arrow.typeclasses.EqK
@@ -37,6 +36,7 @@ import io.reactivex.Flowable
 import io.reactivex.subscribers.TestSubscriber
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class FlowableKTests : RxJavaSpec() {
 
@@ -46,6 +46,8 @@ class FlowableKTests : RxJavaSpec() {
       val res2 = Try { b.value().timeout(5, TimeUnit.SECONDS).blockingFirst() }
       return res1.fold({ t1 ->
         res2.fold({ t2 ->
+          if (t1::class.java == TimeoutException::class.java) throw t1
+          if (t2::class.java == TimeoutException::class.java) throw t2
           (t1::class.java == t2::class.java)
         }, { false })
       }, { v1 ->
@@ -74,8 +76,7 @@ class FlowableKTests : RxJavaSpec() {
   }
 
   init {
-    testLaws(TimerLaws.laws(FlowableK.async(), FlowableK.timer(), EQ()))
-    testLaws(ConcurrentLaws.laws(FlowableK.concurrent(), FlowableK.functor(), FlowableK.applicative(), FlowableK.monad(), GENK(), EQK(), testStackSafety = false))
+    testLaws(ConcurrentLaws.laws(FlowableK.concurrent(), FlowableK.timer(), FlowableK.functor(), FlowableK.applicative(), FlowableK.monad(), GENK(), EQK(), testStackSafety = false))
     // FIXME(paco) #691
     // testLaws(AsyncLaws.laws(FlowableK.async(), EQ(), EQ()))
     // testLaws(AsyncLaws.laws(FlowableK.async(), EQ(), EQ()))

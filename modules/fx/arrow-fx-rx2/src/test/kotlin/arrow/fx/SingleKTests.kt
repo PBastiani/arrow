@@ -22,7 +22,6 @@ import arrow.fx.typeclasses.ExitCase
 import arrow.test.generators.GenK
 import arrow.test.generators.throwable
 import arrow.test.laws.ConcurrentLaws
-import arrow.test.laws.TimerLaws
 import arrow.test.laws.forFew
 import arrow.typeclasses.Eq
 import arrow.typeclasses.EqK
@@ -33,6 +32,7 @@ import io.reactivex.observers.TestObserver
 import io.reactivex.schedulers.Schedulers
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class SingleKTests : RxJavaSpec() {
 
@@ -42,14 +42,14 @@ class SingleKTests : RxJavaSpec() {
     testLaws(
       ConcurrentLaws.laws(
         SingleK.concurrent(),
+        SingleK.timer(),
         SingleK.functor(),
         SingleK.applicative(),
         SingleK.monad(),
         SingleK.genK(),
         SingleK.eqK(),
         testStackSafety = false
-      ),
-      TimerLaws.laws(SingleK.async(), SingleK.timer(), SingleK.eq())
+      )
     )
 
     "Multi-thread Singles finish correctly" {
@@ -202,6 +202,8 @@ private fun <T> SingleK.Companion.eq(): Eq<SingleKOf<T>> = object : Eq<SingleKOf
     val res2 = b.attempt().value().timeout(5, TimeUnit.SECONDS).blockingGet()
     return res1.fold({ t1 ->
       res2.fold({ t2 ->
+        if (t1::class.java == TimeoutException::class.java) throw t1
+        if (t2::class.java == TimeoutException::class.java) throw t2
         (t1::class.java == t2::class.java)
       }, { false })
     }, { v1 ->

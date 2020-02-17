@@ -20,7 +20,6 @@ import arrow.fx.typeclasses.ExitCase
 import arrow.test.generators.GenK
 import arrow.test.generators.throwable
 import arrow.test.laws.ConcurrentLaws
-import arrow.test.laws.TimerLaws
 import arrow.typeclasses.Eq
 import arrow.typeclasses.EqK
 import io.kotlintest.properties.Gen
@@ -30,6 +29,7 @@ import io.reactivex.observers.TestObserver
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.SECONDS
+import java.util.concurrent.TimeoutException
 
 class ObservableKTests : RxJavaSpec() {
 
@@ -37,14 +37,14 @@ class ObservableKTests : RxJavaSpec() {
     testLaws(
       ConcurrentLaws.laws(
         ObservableK.concurrent(),
+        ObservableK.timer(),
         ObservableK.functor(),
         ObservableK.applicative(),
         ObservableK.monad(),
         ObservableK.genk(),
         ObservableK.eqK(),
         testStackSafety = false
-      ),
-      TimerLaws.laws(ObservableK.async(), ObservableK.timer(), ObservableK.eq())
+      )
     )
 
     "Multi-thread Observables finish correctly" {
@@ -128,6 +128,8 @@ private fun <T> ObservableK.Companion.eq(): Eq<ObservableKOf<T>> = object : Eq<O
     val res2 = Try { b.value().timeout(5, SECONDS).blockingFirst() }
     return res1.fold({ t1 ->
       res2.fold({ t2 ->
+        if (t1::class.java == TimeoutException::class.java) throw t1
+        if (t2::class.java == TimeoutException::class.java) throw t2
         (t1::class.java == t2::class.java)
       }, { false })
     }, { v1 ->
